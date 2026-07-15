@@ -27,6 +27,7 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 |------|------|
 | 搜索地区/酒店 | `/skill/search_location` |
 | 搜索酒店列表 | `/skill/search_hotels` |
+| 查询酒店静态详情 | `/skill/get_hotel_detail` |
 | 查询房型和价格 | `/skill/query_room_rates` |
 | 验价锁房 | `/skill/check_room_availability` |
 | 创建预订 | `/skill/create_booking` |
@@ -56,6 +57,11 @@ curl -s -X POST -H "Content-Type: application/json" \
 curl -s -X POST -H "Content-Type: application/json" \
   "http://39.108.114.224:9028/skill/search_hotels" \
   -d '{"token": "<skill_token>", "latitude": 22.518, "longitude": 113.943, "radius_km": 2, "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
+
+# 查询酒店静态详情
+curl -s -X POST -H "Content-Type: application/json" \
+  "http://39.108.114.224:9028/skill/get_hotel_detail" \
+  -d '{"token": "<skill_token>", "hotel_id": "12345"}'
 
 # 查询房型
 curl -s -X POST -H "Content-Type: application/json" \
@@ -133,6 +139,22 @@ curl -s -X POST -H "Content-Type: application/json" \
 | highest_price | int | 最高价格（CNY，可选） |
 
 返回 `data.hotels`，最多 3 家价格最低的候选酒店。附近搜索结果包含 `distance_km`。`min_price` 来自近期酒店最低价缓存，只用于候选排序，不保证适用于指定人数、房间数或同一连续入住产品；必须对候选酒店调用 `query_room_rates` 后再向用户展示真实可订房型与价格。
+
+### /skill/get_hotel_detail
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| token | string | 从 `{baseDir}/skill_token.txt` 读取 |
+| hotel_id | string | 酒店 ID |
+
+返回 `data.hotel` 和 `data.rooms` 静态信息：
+
+- `hotel`：`hotel_id`、`name`、`name_cn`、`address`、`address_cn`、`telephone`、`country_code`、`country`、`region_id`、`region_name_long`、`region_name_long_cn`、`star_rating`、`latitude`、`longitude`
+- 酒店图片：`hotel_image`、`hotel_images`、`image_groups`
+- 酒店描述与设施：`amenities`、`location_desc`、`room_desc`、`policy_description`、`property_description`、`checkin`、`checkout`、`descriptions`、`amenities_hotel`、`amenities_room`、`policies`、`fees`
+- `rooms`：`room_id`、`name`、`name_cn`、`area_range`、`occupancy`、`bed_type`、`bed_type_desc`、`bed_type_desc_cn`、`basic_room_image`
+
+`image_groups` 按原始 `category + caption` 分组；每组的 `images` 包含 `hero_image` 和不同尺寸的 `links`，链接字段为 `method`、`href`、`local_href`。用户询问酒店地址、星级、设施、政策、入住时间、图片或静态房型信息，或者已选定酒店并希望进一步了解时调用本接口。不要对搜索结果中的每家候选酒店自动批量调用；不要把静态房型当作实时可售房型，库存和报价必须调用 `query_room_rates`。
 
 ### /skill/query_room_rates
 
@@ -212,7 +234,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 调用搜索接口前，先判断用户提供的地点类型：
 
 1. **城市或行政区域**：调用 `search_location`，从 `data.regions` 选择用户意图一致的地区，再使用 `region_id` 调用 `search_hotels`。
-2. **具体酒店名称**：使用 `keyword` 调用 `search_hotels` 获取酒店候选；确认目标酒店后直接调用 `query_room_rates`。
+2. **具体酒店名称**：使用 `keyword` 调用 `search_hotels` 获取酒店候选；用户询问酒店详情时调用 `get_hotel_detail`，需要报价时调用 `query_room_rates`。
 3. **地标、商圈、地址或“附近 N km”**：先通过 TourMind 接口结果获得准确坐标，再使用 `latitude`、`longitude`、`radius_km` 调用 `search_hotels`。不得使用模型记忆中的坐标。
 4. 如果接口未返回可确认的准确坐标，必须告知用户当前无法严格保证距离范围，并请用户提供更明确的可识别地点或坐标；不得退化为城市 50km 搜索后声称结果位于地标附近。
 5. 用户指定的距离是硬约束。没有结果时先告知用户，再询问是否扩大范围；获得明确同意后才能修改 `radius_km`。
@@ -222,12 +244,13 @@ curl -s -X POST -H "Content-Type: application/json" \
 ```
 0. 识别地点类型      → 城市 / 酒店名 / 地标或附近范围
 1. 搜索酒店候选      → search_location + search_hotels
-2. 查询候选真实房价  → 对候选酒店逐一调用 query_room_rates
-3. 验价锁房         → check_room_availability
-4. 创建预订         → create_booking（无需手机号和邮箱）
-5. 发起支付         → 询问支付方式后调用 pay_order
-6. 查询订单         → query_booking（随时可查）
-7. 取消订单         → 用户明确要求取消且确认订单号后调用 cancel_booking
+2. 查询酒店详情（按需）→ 用户询问或选定酒店后调用 get_hotel_detail
+3. 查询候选真实房价  → 对需要比较的候选酒店调用 query_room_rates
+4. 验价锁房         → check_room_availability
+5. 创建预订         → create_booking（无需手机号和邮箱）
+6. 发起支付         → 询问支付方式后调用 pay_order
+7. 查询订单         → query_booking（随时可查）
+8. 取消订单         → 用户明确要求取消且确认订单号后调用 cancel_booking
 ```
 
 ---

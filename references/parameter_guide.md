@@ -157,6 +157,59 @@ Each result includes `distance_km`. Never widen a user-provided radius without e
 
 Do not invent coordinates from model knowledge. Use coordinates returned by TourMind APIs. If no exact coordinate can be confirmed, explain that the requested distance cannot be guaranteed and ask for a more specific recognized location or coordinate.
 
+## Hotel Static Detail
+
+Call `POST /skill/get_hotel_detail` with `token` and `hotel_id` when the user asks about a selected hotel's location, contact information, star rating, facilities, policies, check-in/check-out information, images, or static room descriptions.
+
+The response contains `data.hotel`:
+
+| Field | Meaning |
+|-------|---------|
+| `hotel_id` | TourMind hotel ID |
+| `name`, `name_cn` | English and Chinese hotel names |
+| `address`, `address_cn` | English and Chinese addresses |
+| `telephone` | Hotel telephone |
+| `country_code`, `country` | Country code and country name |
+| `region_id`, `region_name_long`, `region_name_long_cn` | Region identifiers and full names |
+| `star_rating` | Hotel star rating |
+| `latitude`, `longitude` | Hotel coordinates |
+| `hotel_image`, `hotel_images` | Primary image and flat image URL list |
+| `image_groups` | Images grouped by original `category + caption` |
+| `amenities` | General amenity description |
+| `location_desc`, `room_desc` | Location and room descriptions |
+| `policy_description`, `property_description` | Policy and property descriptions |
+| `checkin`, `checkout` | Structured check-in and check-out information |
+| `descriptions` | Structured hotel descriptions |
+| `amenities_hotel`, `amenities_room` | Structured hotel-level and room-level facilities |
+| `policies`, `fees` | Structured policies and fees |
+
+Each `image_groups` item contains:
+
+```json
+{
+  "category": 30000,
+  "caption": "Pool",
+  "images": [
+    {
+      "hero_image": false,
+      "links": {
+        "1000px": {
+          "method": "GET",
+          "href": "https://...",
+          "local_href": "https://..."
+        }
+      }
+    }
+  ]
+}
+```
+
+`category` is the source category code and `caption` is its source English label, such as `Room`, `Bathroom`, `Primary image`, `Exterior`, `Restaurant`, `Pool`, `Fitness facility`, or `Spa`. Preserve both fields when presenting or filtering image groups.
+
+The response also contains `data.rooms`, whose items include `room_id`, `name`, `name_cn`, `area_range`, `occupancy`, `bed_type`, `bed_type_desc`, `bed_type_desc_cn`, and `basic_room_image`.
+
+This endpoint returns static content only. Do not infer live inventory, bookability, or current prices from `data.rooms`; call `query_room_rates` for live products. Call details on demand rather than once for every search candidate.
+
 ## Room Rate Response
 
 `query_room_rates` returns all room types. Each room type has `products`; each product represents:
@@ -202,6 +255,8 @@ Use `product.rate.rate_code` for `check_room_availability`. Do not create a book
 `stripe_payment_fee` is an estimate for Stripe payment only. It does not change the room rate; it tells the customer the Stripe platform processing fee and estimated total payable amount if Stripe is selected.
 
 ## Payment Types
+
+The following mapping is for internal tool calls and explicit API integration questions only. Do not include field names or numeric codes in normal customer-facing payment descriptions.
 
 | payment_type | Meaning |
 |--------------|---------|
