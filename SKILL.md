@@ -13,6 +13,7 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 > 3. **正确解读取消政策字段。** `query_room_rates` 返回的是 `cancellation_policy`：`type=non_refundable` 或 `effective_non_refundable=true` 才能视为不可免费取消；`type=free_cancel_before_deadline` 时，`free_cancel_deadline` 是免费取消截止时间。`check_room_availability` 仍可能返回 `cancelPolicyInfos`，其中 `refundable: true` 表示该房型可退款/可取消，不得解释为“不可取消”。
 > 4. **选择 Stripe 支付前必须告知用户手续费。** Stripe 平台会按订单金额收取 3.5% 支付处理手续费；这是 Stripe 平台处理信用卡/支付网络产生的费用，不是酒店房费、税费，也不是 TourMind 针对订单额外收取的费用。接口会返回 `stripe_payment_fee` 供展示。
 > 5. **附近搜索必须严格遵守用户指定的距离。** 不得擅自扩大 `radius_km`，不得凭模型记忆编造地标坐标。`search_hotels` 返回的是带缓存最低价的候选酒店；必须继续调用 `query_room_rates`，才能向用户展示符合入住人数和房间数的真实可订产品。
+> 6. **不得向终端用户展示内部接口字段或枚举值。** 介绍支付能力时只说明支持 Stripe、微信支付和支付宝，不得展示 `payment_type`、支付类型代码或 `4`、`11`、`12` 等内部值。仅当用户明确询问 API 接入、参数定义或调试信息时，才可解释技术字段；工具调用仍须在内部使用正确映射。
 
 ## API
 
@@ -199,7 +200,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 |------|------|------|
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
 | agent_ref_id | string | 订单号 |
-| payment_type | int | `4` = Stripe，`11` = 微信支付，`12` = 支付宝 |
+| payment_type | int | 内部工具参数：`4` = Stripe，`11` = 微信支付，`12` = 支付宝；不得默认向终端用户展示 |
 | return_url | string | 支付完成跳转地址（可选） |
 
 返回 `data.pay_url`、`data.request_id`、`data.third_party_order_no`，将 `pay_url` 分享给用户完成支付。Stripe 支付会额外返回 `data.order_amount` 和 `data.stripe_payment_fee`，其中 `fee_amount` 是 Stripe 平台 3.5% 支付处理手续费，`payable_amount` 是预计支付总额。
@@ -239,7 +240,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 - **不得擅自扩大用户指定的 `radius_km`**；附近搜索没有结果时必须先征得用户同意
 - **`total_price` 使用 `check_room_availability` 返回的价格**，不要使用 `query_room_rates` 的价格
 - **不要主动收集手机号和邮箱** — 预订流程不需要
-- **create_booking 后询问支付方式**，再调用 pay_order；默认优先使用 Stripe（`payment_type=4`），也支持微信支付（11）和支付宝（12）。如果用户选择 Stripe，必须先说明 Stripe 平台会收取 3.5% 支付处理手续费，该费用不是酒店订单费用或 TourMind 额外订单费用
+- **create_booking 后询问支付方式**，面向用户只展示 Stripe、微信支付和支付宝；用户选择后，再在内部映射为对应的 `payment_type` 并调用 pay_order，不得向终端用户展示字段名或枚举值。如果用户选择 Stripe，必须先说明 Stripe 平台会收取 3.5% 支付处理手续费，该费用不是酒店订单费用或 TourMind 额外订单费用
 - **取消订单前必须向用户确认订单号**，再调用 cancel_booking
 - **解读取消政策时：`query_room_rates` 以 `cancellation_policy.type` 和 `effective_non_refundable` 为准；`check_room_availability` 中 `refundable: true` = 可退款/可取消，`startDateTime` = 免费取消截止时间，`amount` = 超过免费取消截止时间后的取消费，不代表不可取消**
 - 接口调用出错时如实告知错误信息，不要编造数据或推荐替代方案
