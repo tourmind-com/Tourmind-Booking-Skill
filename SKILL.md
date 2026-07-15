@@ -12,6 +12,7 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 > 2. **接口返回 HTTP 401 或 `{"ok": false, "error": "unauthorized: ..."}` 时，说明 `token` 无效、已过期或已被删除，必须停止流程：删除 `{baseDir}/skill_token.txt`，提示用户在客户后台 `/user/home` 重新生成 Skill Token 后再继续。**
 > 3. **正确解读取消政策字段。** `query_room_rates` 返回的是 `cancellation_policy`：`type=non_refundable` 或 `effective_non_refundable=true` 才能视为不可免费取消；`type=free_cancel_before_deadline` 时，`free_cancel_deadline` 是免费取消截止时间。`check_room_availability` 仍可能返回 `cancelPolicyInfos`，其中 `refundable: true` 表示该房型可退款/可取消，不得解释为“不可取消”。
 > 4. **选择 Stripe 支付前必须告知用户手续费。** Stripe 平台会按订单金额收取 3.5% 支付处理手续费；这是 Stripe 平台处理信用卡/支付网络产生的费用，不是酒店房费、税费，也不是 TourMind 针对订单额外收取的费用。接口会返回 `stripe_payment_fee` 供展示。
+> 5. **附近搜索必须严格遵守用户指定的距离。** 不得擅自扩大 `radius_km`，不得凭模型记忆编造地标坐标。`search_hotels` 返回的是带缓存最低价的候选酒店；必须继续调用 `query_room_rates`，才能向用户展示符合入住人数和房间数的真实可订产品。
 
 ## API
 
@@ -48,7 +49,12 @@ curl -s -X POST -H "Content-Type: application/json" \
 # 搜索酒店
 curl -s -X POST -H "Content-Type: application/json" \
   "http://39.108.114.224:9028/skill/search_hotels" \
-  -d '{"token": "<skill_token>", "region_id": "3263", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2}'
+  -d '{"token": "<skill_token>", "region_id": "3263", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
+
+# 搜索指定坐标 2km 内的酒店
+curl -s -X POST -H "Content-Type: application/json" \
+  "http://39.108.114.224:9028/skill/search_hotels" \
+  -d '{"token": "<skill_token>", "latitude": 22.518, "longitude": 113.943, "radius_km": 2, "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
 
 # 查询房型
 curl -s -X POST -H "Content-Type: application/json" \
@@ -107,21 +113,25 @@ curl -s -X POST -H "Content-Type: application/json" \
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
 | keyword | string | 搜索关键词（城市名、地标、酒店名等） |
 
-返回 `data.regions`（地区列表，含 `region_id`）和 `data.hotels`（酒店列表，含 `hotel_id`）。
+返回 `data.regions`（地区列表，含 `region_id`、`latitude`、`longitude`）和 `data.hotels`（酒店列表，含 `hotel_id`）。酒店名称模糊搜索可调用 `/skill/search_hotels` 的 `keyword` 模式，该模式返回酒店的 `latitude`、`longitude`，但不查询价格。
 
 ### /skill/search_hotels
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
-| region_id | string | 地区 ID（必须传字符串，如 `"3263"`） |
+| region_id | string | 城市/地区搜索使用的地区 ID（如 `"3263"`）；与坐标模式二选一 |
+| latitude | float | 附近搜索中心纬度；必须与 `longitude`、`radius_km` 一起传入 |
+| longitude | float | 附近搜索中心经度；必须与 `latitude`、`radius_km` 一起传入 |
+| radius_km | float | 搜索半径（公里），必须大于 0，属于不可擅自放宽的硬约束 |
 | check_in_date | string | 入住日期 YYYY-MM-DD |
 | check_out_date | string | 离店日期 YYYY-MM-DD |
 | adults | int | 每间客房成人数 |
+| room_count | int | 房间数（默认 1） |
 | lowest_price | int | 最低价格（CNY，可选） |
 | highest_price | int | 最高价格（CNY，可选） |
 
-返回 `data.hotels`，最多 3 家价格最低的酒店。
+返回 `data.hotels`，最多 3 家价格最低的候选酒店。附近搜索结果包含 `distance_km`。`min_price` 来自近期酒店最低价缓存，只用于候选排序，不保证适用于指定人数、房间数或同一连续入住产品；必须对候选酒店调用 `query_room_rates` 后再向用户展示真实可订房型与价格。
 
 ### /skill/query_room_rates
 
@@ -196,12 +206,22 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 ---
 
+## 地点搜索路由
+
+调用搜索接口前，先判断用户提供的地点类型：
+
+1. **城市或行政区域**：调用 `search_location`，从 `data.regions` 选择用户意图一致的地区，再使用 `region_id` 调用 `search_hotels`。
+2. **具体酒店名称**：使用 `keyword` 调用 `search_hotels` 获取酒店候选；确认目标酒店后直接调用 `query_room_rates`。
+3. **地标、商圈、地址或“附近 N km”**：先通过 TourMind 接口结果获得准确坐标，再使用 `latitude`、`longitude`、`radius_km` 调用 `search_hotels`。不得使用模型记忆中的坐标。
+4. 如果接口未返回可确认的准确坐标，必须告知用户当前无法严格保证距离范围，并请用户提供更明确的可识别地点或坐标；不得退化为城市 50km 搜索后声称结果位于地标附近。
+5. 用户指定的距离是硬约束。没有结果时先告知用户，再询问是否扩大范围；获得明确同意后才能修改 `radius_km`。
+
 ## 预订流程
 
 ```
-0. 搜索地区（如需要）→ search_location 获取 region_id
-1. 搜索酒店         → search_hotels
-2. 查询房型价格     → query_room_rates
+0. 识别地点类型      → 城市 / 酒店名 / 地标或附近范围
+1. 搜索酒店候选      → search_location + search_hotels
+2. 查询候选真实房价  → 对候选酒店逐一调用 query_room_rates
 3. 验价锁房         → check_room_availability
 4. 创建预订         → create_booking（无需手机号和邮箱）
 5. 发起支付         → 询问支付方式后调用 pay_order
@@ -215,6 +235,8 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 - **所有日期格式必须是 `YYYY-MM-DD`**
 - **`region_id`、`hotel_id` 必须以字符串传入**（如 `"3263"`，不是 `3263`）
+- **不得将 `search_hotels.min_price` 描述为最终可订价**；入住人数、房间数、餐食和取消政策以 `query_room_rates` 返回为准
+- **不得擅自扩大用户指定的 `radius_km`**；附近搜索没有结果时必须先征得用户同意
 - **`total_price` 使用 `check_room_availability` 返回的价格**，不要使用 `query_room_rates` 的价格
 - **不要主动收集手机号和邮箱** — 预订流程不需要
 - **create_booking 后询问支付方式**，再调用 pay_order；默认优先使用 Stripe（`payment_type=4`），也支持微信支付（11）和支付宝（12）。如果用户选择 Stripe，必须先说明 Stripe 平台会收取 3.5% 支付处理手续费，该费用不是酒店订单费用或 TourMind 额外订单费用

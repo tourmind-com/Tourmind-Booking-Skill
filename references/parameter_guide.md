@@ -129,6 +129,34 @@ Skill Tokens expire after 3 months and can be deleted by the customer. If a toke
 
 ---
 
+## Nearby Hotel Search
+
+`search_hotels` supports two priced-candidate location modes:
+
+| Mode | Required location fields | Meaning |
+|------|--------------------------|---------|
+| Region | `region_id` | Search from the configured region center using the existing region range |
+| Nearby | `latitude`, `longitude`, `radius_km` | Search strictly within the explicit radius around the supplied coordinate |
+
+Nearby request example:
+
+```json
+{
+  "token": "<skill_token>",
+  "latitude": 22.518,
+  "longitude": 113.943,
+  "radius_km": 2,
+  "check_in_date": "2026-07-20",
+  "check_out_date": "2026-07-21",
+  "adults": 2,
+  "room_count": 1
+}
+```
+
+Each result includes `distance_km`. Never widen a user-provided radius without explicit approval. `min_price` is a recent cached candidate price, not an occupancy-specific guaranteed rate. Call `query_room_rates` for every candidate that will be compared or recommended.
+
+Do not invent coordinates from model knowledge. Use coordinates returned by TourMind APIs. If no exact coordinate can be confirmed, explain that the requested distance cannot be guaranteed and ask for a more specific recognized location or coordinate.
+
 ## Room Rate Response
 
 `query_room_rates` returns all room types. Each room type has `products`; each product represents:
@@ -197,8 +225,10 @@ When `payment_type=4` (Stripe), the response also includes:
 
 ```
 User request for booking?
-├─ Search? → search_hotels with region + dates
-│  └─ Got hotel → query_room_rates with hotel_id
+├─ City search? → search_location → search_hotels with region + dates
+├─ Exact hotel? → search_hotels with keyword → query_room_rates with hotel_id
+├─ Landmark/nearby? → resolve exact coordinate → search_hotels with coordinates + radius
+│  └─ Got candidates → query_room_rates for each candidate being presented
 │     └─ Compare rates → check_room_availability for specific room
 │        └─ Available? → create_booking with guest info
 │           └─ Success → query_booking for confirmation
