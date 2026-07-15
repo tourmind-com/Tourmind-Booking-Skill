@@ -254,19 +254,17 @@ Use `product.rate.rate_code` for `check_room_availability`. Do not create a book
 
 `stripe_payment_fee` is an estimate for Stripe payment only. It does not change the room rate; it tells the customer the Stripe platform processing fee and estimated total payable amount if Stripe is selected.
 
-## Payment Types
+## Payment Methods
 
-The following mapping is for internal tool calls and explicit API integration questions only. Do not include field names or numeric codes in normal customer-facing payment descriptions.
-
-| payment_type | Meaning |
-|--------------|---------|
-| `4` | Stripe |
-| `11` | WeChat Pay |
-| `12` | Alipay |
+| payment_method | Meaning |
+|----------------|---------|
+| `Stripe` | Stripe |
+| `微信支付` | WeChat Pay |
+| `支付宝` | Alipay |
 
 `pay_order` returns `pay_url`, `request_id`, and `third_party_order_no`.
 
-When `payment_type=4` (Stripe), the response also includes:
+When `payment_method=Stripe`, the response also includes:
 
 | Field | Meaning |
 |-------|---------|
