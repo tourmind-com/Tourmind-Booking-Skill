@@ -56,15 +56,15 @@ git clone git@github.com:tourmind-com/Tourmind-Booking-Skill.git ~/.codex/skills
 
 | 接口 | 说明 |
 |------|------|
-| `POST /skill/search_location` | 搜索地区或酒店 |
-| `POST /skill/search_hotels` | 搜索酒店列表 |
-| `POST /skill/get_hotel_detail` | 查询酒店静态详情 |
-| `POST /skill/query_room_rates` | 查询房型和价格 |
-| `POST /skill/check_room_availability` | 验价锁房 |
-| `POST /skill/create_booking` | 创建预订 |
-| `POST /skill/query_booking` | 查询预订 |
-| `POST /skill/cancel_booking` | 取消预订 |
-| `POST /skill/pay_order` | 发起支付 |
+| `POST /tob/skill/search_location` | 搜索地区或酒店 |
+| `POST /tob/skill/search_hotels` | 搜索酒店列表 |
+| `POST /tob/skill/get_hotel_detail` | 查询酒店静态详情 |
+| `POST /tob/skill/query_room_rates` | 查询房型和价格 |
+| `POST /tob/skill/check_room_availability` | 验价锁房 |
+| `POST /tob/skill/create_booking` | 创建预订 |
+| `POST /tob/skill/query_booking` | 查询预订 |
+| `POST /tob/skill/cancel_booking` | 取消预订 |
+| `POST /tob/skill/pay_order` | 发起支付 |
 
 所有请求体需包含客户后台 `/user/home` 生成的 `token`。
 

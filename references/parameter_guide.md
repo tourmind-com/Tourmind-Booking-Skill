@@ -161,7 +161,7 @@ Do not invent coordinates from model knowledge. Use coordinates returned by Tour
 
 ## Hotel Static Detail
 
-Call `POST /skill/get_hotel_detail` with `token` and `hotel_id` when the user asks about a selected hotel's location, contact information, star rating, facilities, policies, check-in/check-out information, images, or static room descriptions.
+Call `POST /tob/skill/get_hotel_detail` with `token` and `hotel_id` when the user asks about a selected hotel's location, contact information, star rating, facilities, policies, check-in/check-out information, images, or static room descriptions.
 
 The response contains `data.hotel`:
 

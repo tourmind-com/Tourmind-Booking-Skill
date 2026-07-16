@@ -14,7 +14,7 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 > 4. **选择 Stripe 支付前必须告知用户手续费。** Stripe 平台会按订单金额收取 3.5% 支付处理手续费；这是 Stripe 平台处理信用卡/支付网络产生的费用，不是酒店房费、税费，也不是 TourMind 针对订单额外收取的费用。接口会返回 `stripe_payment_fee` 供展示。
 > 5. **附近搜索必须严格遵守用户指定的距离。** 不得擅自扩大 `radius_km`，不得凭模型记忆编造地标坐标。`search_hotels` 返回的是带缓存最低价的候选酒店；必须继续调用 `query_room_rates`，才能向用户展示符合入住人数和房间数的真实可订产品。
 > 6. **支付方式使用名称枚举。** 介绍和调用支付能力时只使用 `Stripe`、`微信支付`、`支付宝`，不得展示或猜测内部支付代码。
-> 7. **创建预订前应询问联系邮箱。** 验价成功后、调用 `create_booking` 前，确认入住人姓名，并询问用户是否填写 `contact_email`：“是否需要填写联系邮箱？填写后，预订成功、预订失败及订单取消等状态通知会发送至该邮箱；不填写也可以继续下单，但将无法通过邮箱接收这些订单通知。”用户可以拒绝或跳过，不得因此中断下单；不得猜测、编造或复用未经用户确认的邮箱。手机号不需要收集。
+> 7. **创建预订前必须询问联系邮箱。** 每次调用 `create_booking` 前，确认入住人姓名，并询问用户是否填写 `contact_email`：“是否需要填写联系邮箱？填写后，预订成功、预订失败及订单取消等状态通知会发送至该邮箱；不填写也可以继续下单，但将无法通过邮箱接收这些订单通知。”只有用户提供邮箱或明确选择跳过后才能继续创建订单。`contact_email` 字段本身可选；不得猜测、编造或复用未经用户确认的邮箱。手机号不需要收集。
 
 ## API
 
@@ -26,15 +26,15 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 
 | 功能 | Path |
 |------|------|
-| 搜索地区/酒店 | `/skill/search_location` |
-| 搜索酒店列表 | `/skill/search_hotels` |
-| 查询酒店静态详情 | `/skill/get_hotel_detail` |
-| 查询房型和价格 | `/skill/query_room_rates` |
-| 验价锁房 | `/skill/check_room_availability` |
-| 创建预订 | `/skill/create_booking` |
-| 查询预订 | `/skill/query_booking` |
-| 取消预订 | `/skill/cancel_booking` |
-| 发起支付 | `/skill/pay_order` |
+| 搜索地区/酒店 | `/tob/skill/search_location` |
+| 搜索酒店列表 | `/tob/skill/search_hotels` |
+| 查询酒店静态详情 | `/tob/skill/get_hotel_detail` |
+| 查询房型和价格 | `/tob/skill/query_room_rates` |
+| 验价锁房 | `/tob/skill/check_room_availability` |
+| 创建预订 | `/tob/skill/create_booking` |
+| 查询预订 | `/tob/skill/query_booking` |
+| 取消预订 | `/tob/skill/cancel_booking` |
+| 发起支付 | `/tob/skill/pay_order` |
 
 ### 响应格式
 
@@ -46,52 +46,52 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 ```bash
 # 搜索地区
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/search_location" \
+  "http://39.108.114.224:9028/tob/skill/search_location" \
   -d '{"token": "<skill_token>", "keyword": "东京"}'
 
 # 搜索酒店
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/search_hotels" \
+  "http://39.108.114.224:9028/tob/skill/search_hotels" \
   -d '{"token": "<skill_token>", "region_id": "3263", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
 
 # 搜索指定坐标 2km 内的酒店
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/search_hotels" \
+  "http://39.108.114.224:9028/tob/skill/search_hotels" \
   -d '{"token": "<skill_token>", "latitude": 22.518, "longitude": 113.943, "radius_km": 2, "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
 
 # 查询酒店静态详情
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/get_hotel_detail" \
+  "http://39.108.114.224:9028/tob/skill/get_hotel_detail" \
   -d '{"token": "<skill_token>", "hotel_id": "12345"}'
 
 # 查询房型
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/query_room_rates" \
+  "http://39.108.114.224:9028/tob/skill/query_room_rates" \
   -d '{"token": "<skill_token>", "hotel_id": "12345", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
 
 # 验价
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/check_room_availability" \
+  "http://39.108.114.224:9028/tob/skill/check_room_availability" \
   -d '{"token": "<skill_token>", "hotel_id": "12345", "rate_code": "xxx", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "adults": 2, "room_count": 1}'
 
 # 创建预订
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/create_booking" \
+  "http://39.108.114.224:9028/tob/skill/create_booking" \
   -d '{"token": "<skill_token>", "hotel_id": "12345", "rate_code": "xxx", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "guest_name": "张三", "contact_email": "guest@example.com", "adults": 2, "room_count": 1, "total_price": 1260.00}'
 
 # 查询预订
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/query_booking" \
+  "http://39.108.114.224:9028/tob/skill/query_booking" \
   -d '{"token": "<skill_token>", "agent_ref_id": "TM20260501001"}'
 
 # 取消预订
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/cancel_booking" \
+  "http://39.108.114.224:9028/tob/skill/cancel_booking" \
   -d '{"token": "<skill_token>", "agent_ref_id": "TM20260501001"}'
 
 # 支付
 curl -s -X POST -H "Content-Type: application/json" \
-  "http://39.108.114.224:9028/skill/pay_order" \
+  "http://39.108.114.224:9028/tob/skill/pay_order" \
   -d '{"token": "<skill_token>", "agent_ref_id": "TM20260501001", "payment_method": "Stripe"}'
 ```
 
@@ -114,16 +114,16 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 ## 接口参数说明
 
-### /skill/search_location
+### /tob/skill/search_location
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
 | keyword | string | 搜索关键词（城市名、地标、酒店名等） |
 
-返回 `data.regions`（地区列表，含 `region_id`、`latitude`、`longitude`）和 `data.hotels`（酒店列表，含 `hotel_id`）。酒店名称模糊搜索可调用 `/skill/search_hotels` 的 `keyword` 模式，该模式返回酒店的 `latitude`、`longitude`，但不查询价格。
+返回 `data.regions`（地区列表，含 `region_id`、`latitude`、`longitude`）和 `data.hotels`（酒店列表，含 `hotel_id`）。酒店名称模糊搜索可调用 `/tob/skill/search_hotels` 的 `keyword` 模式，该模式返回酒店的 `latitude`、`longitude`，但不查询价格。
 
-### /skill/search_hotels
+### /tob/skill/search_hotels
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -141,7 +141,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 返回 `data.hotels`，最多 20 家价格最低的候选酒店。附近搜索结果包含 `distance_km`。`min_price` 来自近期酒店最低价缓存，只用于候选排序，不保证适用于指定人数、房间数或同一连续入住产品；必须对候选酒店调用 `query_room_rates` 后再向用户展示真实可订房型与价格。
 
-### /skill/get_hotel_detail
+### /tob/skill/get_hotel_detail
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -157,7 +157,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 `image_groups` 按原始 `category + caption` 分组；每组的 `images` 包含 `hero_image` 和不同尺寸的 `links`，链接字段为 `method`、`href`、`local_href`。用户询问酒店地址、星级、设施、政策、入住时间、图片或静态房型信息，或者已选定酒店并希望进一步了解时调用本接口。不要对搜索结果中的每家候选酒店自动批量调用；不要把静态房型当作实时可售房型，库存和报价必须调用 `query_room_rates`。
 
-### /skill/query_room_rates
+### /tob/skill/query_room_rates
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -170,7 +170,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 返回 `data.room_types`。每个房型包含 `room_type_code`、`name`、`name_cn`、`bed_type_desc`、`basic_room_image` 和 `products`；`basic_room_image` 是该标准房型的基础图片。每个 product 按「房型 + 最大入住人 + 餐食 + 取消政策」聚合，只返回该产品维度最低价 RP：`product.rate.rate_code`、`currency`、`total_price`、`per_night_price`、`payment_type`、`is_on_request`、`stripe_payment_fee`，以及 `cancellation_policy`。`stripe_payment_fee` 是用户选择 Stripe 支付时的预估手续费和预估支付总额，不改变房价本身。
 
-### /skill/check_room_availability
+### /tob/skill/check_room_availability
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -184,7 +184,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 返回 `data.room_types`，验价成功后的实时价格和 `rate_code`（可能与查询时不同），以及实时取消政策。创建订单必须使用验价返回的 `rate_code` 和价格。
 
-### /skill/create_booking
+### /tob/skill/create_booking
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -202,14 +202,14 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 返回 `data.agent_ref_id`（订单号）。
 
-### /skill/query_booking
+### /tob/skill/query_booking
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
 | agent_ref_id | string | create_booking 返回的订单号 |
 
-### /skill/cancel_booking
+### /tob/skill/cancel_booking
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -218,7 +218,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 返回 `data.status`、`data.cancel_fee`、`data.refund_amount`（如有）、`data.currency`。取消前必须向用户确认要取消的订单号。
 
-### /skill/pay_order
+### /tob/skill/pay_order
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
@@ -248,7 +248,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 2. 查询酒店详情（按需）→ 用户询问或选定酒店后调用 get_hotel_detail
 3. 查询候选真实房价  → 对需要比较的候选酒店调用 query_room_rates
 4. 验价锁房         → check_room_availability
-5. 收集预订信息     → 确认入住人姓名，询问是否填写联系邮箱并说明通知用途
+5. 收集预订信息     → 确认入住人姓名；必须询问联系邮箱，获得邮箱或用户明确跳过后继续
 6. 创建预订         → create_booking（无需手机号）
 7. 发起支付         → 询问支付方式后调用 pay_order
 8. 查询订单         → query_booking（随时可查）
@@ -264,7 +264,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 - **不得将 `search_hotels.min_price` 描述为最终可订价**；入住人数、房间数、餐食和取消政策以 `query_room_rates` 返回为准
 - **不得擅自扩大用户指定的 `radius_km`**；附近搜索没有结果时必须先征得用户同意
 - **`total_price` 使用 `check_room_availability` 返回的价格**，不要使用 `query_room_rates` 的价格
-- **调用 create_booking 前应询问用户是否填写联系邮箱**，并说明填写后可接收预订成功、预订失败及订单取消等状态通知，不填写则无法通过邮箱接收这些通知；用户可以跳过，不得猜测或编造邮箱，手机号不需要收集
+- **每次调用 create_booking 前必须询问用户是否填写联系邮箱**，并说明填写后可接收预订成功、预订失败及订单取消等状态通知，不填写则无法通过邮箱接收这些通知；只有用户提供邮箱或明确选择跳过后才能继续，不得猜测或编造邮箱，手机号不需要收集
 - **create_booking 后询问支付方式**，只展示 Stripe、微信支付和支付宝；用户选择后，将对应名称作为 `payment_method` 调用 pay_order。如果用户选择 Stripe，必须先说明 Stripe 平台会收取 3.5% 支付处理手续费，该费用不是酒店订单费用或 TourMind 额外订单费用
 - **取消订单前必须向用户确认订单号**，再调用 cancel_booking
 - **解读取消政策时：`query_room_rates` 以 `cancellation_policy.type` 和 `effective_non_refundable` 为准；`check_room_availability` 中 `refundable: true` = 可退款/可取消，`startDateTime` = 免费取消截止时间，`amount` = 超过免费取消截止时间后的取消费，不代表不可取消**
