@@ -155,6 +155,8 @@ Nearby request example:
 
 Each result includes `distance_km`. Never widen a user-provided radius without explicit approval. `min_price` is a recent cached candidate price, not an occupancy-specific guaranteed rate. Call `query_room_rates` for every candidate that will be compared or recommended.
 
+The endpoint returns at most 20 candidate hotels.
+
 Do not invent coordinates from model knowledge. Use coordinates returned by TourMind APIs. If no exact coordinate can be confirmed, explain that the requested distance cannot be guaranteed and ask for a more specific recognized location or coordinate.
 
 ## Hotel Static Detail
@@ -212,7 +214,7 @@ This endpoint returns static content only. Do not infer live inventory, bookabil
 
 ## Room Rate Response
 
-`query_room_rates` returns all room types. Each room type has `products`; each product represents:
+`query_room_rates` returns all room types. Each room type includes `room_type_code`, `name`, `name_cn`, `bed_type_desc`, `basic_room_image`, and `products`. `basic_room_image` is the image associated with that standardized room type. Each product represents:
 
 - room type
 - max occupancy
@@ -254,6 +256,10 @@ Use `product.rate.rate_code` for `check_room_availability`. Do not create a book
 
 `stripe_payment_fee` is an estimate for Stripe payment only. It does not change the room rate; it tells the customer the Stripe platform processing fee and estimated total payable amount if Stripe is selected.
 
+## Booking Contact Email
+
+`create_booking.contact_email` is optional. Before creating the booking, ask whether the user wants to provide a contact email and explain that it is used for booking confirmation, booking failure, cancellation, and other order status notifications. The user may skip it and continue booking, but will not receive those notifications by email. Never invent or reuse an email address that the user has not confirmed.
+
 ## Payment Methods
 
 | payment_method | Meaning |
@@ -263,6 +269,8 @@ Use `product.rate.rate_code` for `check_room_availability`. Do not create a book
 | `支付宝` | Alipay |
 
 `pay_order` returns `pay_url`, `request_id`, and `third_party_order_no`.
+
+`pay_order` does not accept a custom return URL. Stripe payments return to the TourMind Skill payment result page after completion.
 
 When `payment_method=Stripe`, the response also includes:
 
@@ -283,7 +291,7 @@ User request for booking?
 ├─ Landmark/nearby? → resolve exact coordinate → search_hotels with coordinates + radius
 │  └─ Got candidates → query_room_rates for each candidate being presented
 │     └─ Compare rates → check_room_availability for specific room
-│        └─ Available? → create_booking with guest info
+│        └─ Available? → collect guest name, offer optional contact email notifications → create_booking
 │           └─ Success → query_booking for confirmation
 │
 ├─ Check status? → query_booking with booking_id

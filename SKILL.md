@@ -14,6 +14,7 @@ metadata.openclaw: {"emoji": "🏨", "primaryEnv": "skill_token.txt"}
 > 4. **选择 Stripe 支付前必须告知用户手续费。** Stripe 平台会按订单金额收取 3.5% 支付处理手续费；这是 Stripe 平台处理信用卡/支付网络产生的费用，不是酒店房费、税费，也不是 TourMind 针对订单额外收取的费用。接口会返回 `stripe_payment_fee` 供展示。
 > 5. **附近搜索必须严格遵守用户指定的距离。** 不得擅自扩大 `radius_km`，不得凭模型记忆编造地标坐标。`search_hotels` 返回的是带缓存最低价的候选酒店；必须继续调用 `query_room_rates`，才能向用户展示符合入住人数和房间数的真实可订产品。
 > 6. **支付方式使用名称枚举。** 介绍和调用支付能力时只使用 `Stripe`、`微信支付`、`支付宝`，不得展示或猜测内部支付代码。
+> 7. **创建预订前应询问联系邮箱。** 验价成功后、调用 `create_booking` 前，确认入住人姓名，并询问用户是否填写 `contact_email`：“是否需要填写联系邮箱？填写后，预订成功、预订失败及订单取消等状态通知会发送至该邮箱；不填写也可以继续下单，但将无法通过邮箱接收这些订单通知。”用户可以拒绝或跳过，不得因此中断下单；不得猜测、编造或复用未经用户确认的邮箱。手机号不需要收集。
 
 ## API
 
@@ -76,7 +77,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 # 创建预订
 curl -s -X POST -H "Content-Type: application/json" \
   "http://39.108.114.224:9028/skill/create_booking" \
-  -d '{"token": "<skill_token>", "hotel_id": "12345", "rate_code": "xxx", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "guest_name": "张三", "adults": 2, "room_count": 1, "total_price": 1260.00}'
+  -d '{"token": "<skill_token>", "hotel_id": "12345", "rate_code": "xxx", "check_in_date": "2026-05-01", "check_out_date": "2026-05-03", "guest_name": "张三", "contact_email": "guest@example.com", "adults": 2, "room_count": 1, "total_price": 1260.00}'
 
 # 查询预订
 curl -s -X POST -H "Content-Type: application/json" \
@@ -138,7 +139,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 | lowest_price | int | 最低价格（CNY，可选） |
 | highest_price | int | 最高价格（CNY，可选） |
 
-返回 `data.hotels`，最多 3 家价格最低的候选酒店。附近搜索结果包含 `distance_km`。`min_price` 来自近期酒店最低价缓存，只用于候选排序，不保证适用于指定人数、房间数或同一连续入住产品；必须对候选酒店调用 `query_room_rates` 后再向用户展示真实可订房型与价格。
+返回 `data.hotels`，最多 20 家价格最低的候选酒店。附近搜索结果包含 `distance_km`。`min_price` 来自近期酒店最低价缓存，只用于候选排序，不保证适用于指定人数、房间数或同一连续入住产品；必须对候选酒店调用 `query_room_rates` 后再向用户展示真实可订房型与价格。
 
 ### /skill/get_hotel_detail
 
@@ -167,7 +168,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 | adults | int | 每间客房成人数 |
 | room_count | int | 房间数（默认 1） |
 
-返回 `data.room_types`。每个房型包含 `room_type_code`、`name`、`name_cn`、`bed_type_desc` 和 `products`。每个 product 按「房型 + 最大入住人 + 餐食 + 取消政策」聚合，只返回该产品维度最低价 RP：`product.rate.rate_code`、`currency`、`total_price`、`per_night_price`、`payment_type`、`is_on_request`、`stripe_payment_fee`，以及 `cancellation_policy`。`stripe_payment_fee` 是用户选择 Stripe 支付时的预估手续费和预估支付总额，不改变房价本身。
+返回 `data.room_types`。每个房型包含 `room_type_code`、`name`、`name_cn`、`bed_type_desc`、`basic_room_image` 和 `products`；`basic_room_image` 是该标准房型的基础图片。每个 product 按「房型 + 最大入住人 + 餐食 + 取消政策」聚合，只返回该产品维度最低价 RP：`product.rate.rate_code`、`currency`、`total_price`、`per_night_price`、`payment_type`、`is_on_request`、`stripe_payment_fee`，以及 `cancellation_policy`。`stripe_payment_fee` 是用户选择 Stripe 支付时的预估手续费和预估支付总额，不改变房价本身。
 
 ### /skill/check_room_availability
 
@@ -193,6 +194,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 | check_in_date | string | 入住日期 |
 | check_out_date | string | 离店日期 |
 | guest_name | string | 入住人姓名（系统自动解析中英文） |
+| contact_email | string | 联系邮箱（可选）；填写后用于接收预订成功、预订失败及订单取消等状态通知，不填写则无法通过邮箱接收这些通知 |
 | adults | int | 每间客房成人数 |
 | room_count | int | 房间数（默认 1） |
 | currency | string | 货币，默认 CNY |
@@ -223,9 +225,8 @@ curl -s -X POST -H "Content-Type: application/json" \
 | token | string | 从 `{baseDir}/skill_token.txt` 读取 |
 | agent_ref_id | string | 订单号 |
 | payment_method | string | 支付方式枚举：`Stripe`、`微信支付`、`支付宝` |
-| return_url | string | 支付完成跳转地址（可选） |
 
-返回 `data.pay_url`、`data.request_id`、`data.third_party_order_no`，将 `pay_url` 分享给用户完成支付。Stripe 支付会额外返回 `data.order_amount` 和 `data.stripe_payment_fee`，其中 `fee_amount` 是 Stripe 平台 3.5% 支付处理手续费，`payable_amount` 是预计支付总额。
+返回 `data.pay_url`、`data.request_id`、`data.third_party_order_no`，将 `pay_url` 分享给用户完成支付。Stripe 支付完成后固定跳转至 TourMind Skill 支付结果页，并额外返回 `data.order_amount` 和 `data.stripe_payment_fee`，其中 `fee_amount` 是 Stripe 平台 3.5% 支付处理手续费，`payable_amount` 是预计支付总额。
 
 ---
 
@@ -247,10 +248,11 @@ curl -s -X POST -H "Content-Type: application/json" \
 2. 查询酒店详情（按需）→ 用户询问或选定酒店后调用 get_hotel_detail
 3. 查询候选真实房价  → 对需要比较的候选酒店调用 query_room_rates
 4. 验价锁房         → check_room_availability
-5. 创建预订         → create_booking（无需手机号和邮箱）
-6. 发起支付         → 询问支付方式后调用 pay_order
-7. 查询订单         → query_booking（随时可查）
-8. 取消订单         → 用户明确要求取消且确认订单号后调用 cancel_booking
+5. 收集预订信息     → 确认入住人姓名，询问是否填写联系邮箱并说明通知用途
+6. 创建预订         → create_booking（无需手机号）
+7. 发起支付         → 询问支付方式后调用 pay_order
+8. 查询订单         → query_booking（随时可查）
+9. 取消订单         → 用户明确要求取消且确认订单号后调用 cancel_booking
 ```
 
 ---
@@ -262,7 +264,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 - **不得将 `search_hotels.min_price` 描述为最终可订价**；入住人数、房间数、餐食和取消政策以 `query_room_rates` 返回为准
 - **不得擅自扩大用户指定的 `radius_km`**；附近搜索没有结果时必须先征得用户同意
 - **`total_price` 使用 `check_room_availability` 返回的价格**，不要使用 `query_room_rates` 的价格
-- **不要主动收集手机号和邮箱** — 预订流程不需要
+- **调用 create_booking 前应询问用户是否填写联系邮箱**，并说明填写后可接收预订成功、预订失败及订单取消等状态通知，不填写则无法通过邮箱接收这些通知；用户可以跳过，不得猜测或编造邮箱，手机号不需要收集
 - **create_booking 后询问支付方式**，只展示 Stripe、微信支付和支付宝；用户选择后，将对应名称作为 `payment_method` 调用 pay_order。如果用户选择 Stripe，必须先说明 Stripe 平台会收取 3.5% 支付处理手续费，该费用不是酒店订单费用或 TourMind 额外订单费用
 - **取消订单前必须向用户确认订单号**，再调用 cancel_booking
 - **解读取消政策时：`query_room_rates` 以 `cancellation_policy.type` 和 `effective_non_refundable` 为准；`check_room_availability` 中 `refundable: true` = 可退款/可取消，`startDateTime` = 免费取消截止时间，`amount` = 超过免费取消截止时间后的取消费，不代表不可取消**
