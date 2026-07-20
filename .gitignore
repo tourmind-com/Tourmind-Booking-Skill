@@ -1,0 +1,11 @@
+skill_token.txt
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Local review and validation artifacts; not part of the installable skill.
+SKILL.zh-CN.md
+EVAL_GUIDE.md
+TEST_REPORT.md
+evals/
+scripts/validate_booking.py

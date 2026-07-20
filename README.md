@@ -1,103 +1,93 @@
 # TourMind Booking Skill
 
-TourMind ToB 酒店预订 Skill，支持搜索酒店、查询房型、验价锁房、创建预订、发起支付的完整工作流。
+TourMind's end-to-end hotel booking skill for AI clients. It supports POI resolution, live hotel and room comparison, rate verification, booking, order management, cancellation, and payment.
 
-## 功能
+## Features
 
-- **搜索地区/酒店**：按城市名、地标、酒店名模糊搜索
-- **搜索酒店列表**：按地区或指定坐标半径查询带距离的最低价候选酒店
-- **查询酒店详情**：获取地址、星级、设施、政策、图片分类和静态房型信息
-- **查询房型价格**：获取指定酒店的全部房型和实时价格
-- **验价锁房**：锁定房价，确保预订前价格有效
-- **创建预订**：提交订单，支持中英文姓名自动解析
-- **查询预订**：随时查看订单状态和确认号
-- **发起支付**：支持 Stripe、微信支付和支付宝；选择 Stripe 时会展示 Stripe 平台 3.5% 支付处理手续费说明
+- Resolves cities, hotels, landmarks, stations, and other POIs without inventing coordinates.
+- Verifies up to 20 hotel candidates against live room products and selects the five best matches.
+- Returns consistent hotel cards with images, distance, live prices, cancellation terms, tax status, and evidence-based match reasons.
+- Returns hotel details, room images, beds, meals, live quotes, and cancellation terms together.
+- Rechecks price and availability before booking.
+- Creates bookings after collecting the guest's legal name and required contact email.
+- Queries and cancels existing bookings.
+- Starts Stripe, WeChat Pay, or Alipay payments and discloses Stripe's 3.5% processing fee when applicable.
 
-## 目录结构
+## Installable contents
 
 ```
-├── SKILL.md              # Skill 主文件
-├── README.md             # 本文档
-├── EVAL_GUIDE.md         # 测试评估指南
-├── TEST_REPORT.md        # 测试报告
-├── evals/
-│   └── evals.json        # 测试用例
+├── .gitignore
+├── LICENSE
+├── README.md
+├── SKILL.md
 ├── references/
-│   └── parameter_guide.md  # 参数参考（region_id、货币代码等）
-└── scripts/
-    └── validate_booking.py # 接口测试脚本
+│   └── parameter_guide.md
 ```
 
-## 快速部署
+Evaluation fixtures, test reports, review translations, and development-only validators are intentionally excluded from the installable release.
 
-### 1. 启动 Skill HTTP Server
+## Installation
+
+Clone the repository into your AI client's skills directory:
 
 ```bash
-go build -o chls-skill ./mcp/cmd/
-nohup ./chls-skill -port :9061 > chls-skill.log 2>&1 &
+mkdir -p ~/.codex/skills
+git clone https://github.com/tourmind-com/Tourmind-Booking-Skill.git ~/.codex/skills/tourmind-booking
 ```
 
-所需环境变量与主业务服务相同（数据库、RPC 地址等）。
-
-### 2. 安装 Skill
-
-从 ToB Skill 仓库安装到 AI 客户端的技能目录，重启客户端或网关：
+Generate a Skill Token in the customer portal at `/user/home`, save it as `skill_token.txt` in the installed skill directory, and restrict its permissions:
 
 ```bash
-mkdir -p ~/.codex/skills/tourmind-booking
-git clone git@github.com:tourmind-com/Tourmind-Booking-Skill.git ~/.codex/skills/tourmind-booking
+chmod 600 ~/.codex/skills/tourmind-booking/skill_token.txt
 ```
 
-无需额外配置 MCP server，Skill 直接通过 HTTP 调用 TourMind Skill API。
+The token file is excluded by `.gitignore` and must never be committed. Restart the AI client or gateway after installation. No local MCP server is required; the skill calls the TourMind Skill API directly over HTTP.
 
 ## API
 
 **Base URL:** `http://39.108.114.224:9028`
 
-| 接口 | 说明 |
-|------|------|
-| `POST /tob/skill/search_location` | 搜索地区或酒店 |
-| `POST /tob/skill/search_hotels` | 搜索酒店列表 |
-| `POST /tob/skill/get_hotel_detail` | 查询酒店静态详情 |
-| `POST /tob/skill/query_room_rates` | 查询房型和价格 |
-| `POST /tob/skill/check_room_availability` | 验价锁房 |
-| `POST /tob/skill/create_booking` | 创建预订 |
-| `POST /tob/skill/query_booking` | 查询预订 |
-| `POST /tob/skill/cancel_booking` | 取消预订 |
-| `POST /tob/skill/pay_order` | 发起支付 |
+| Endpoint | Purpose |
+|---|---|
+| `POST /tob/skill/search_location` | Resolve a region, POI, or hotel |
+| `POST /tob/skill/search_hotels` | Search hotel candidates |
+| `POST /tob/skill/get_hotel_detail` | Get hotel details and images |
+| `POST /tob/skill/query_room_rates` | Get live rooms and rates |
+| `POST /tob/skill/check_room_availability` | Recheck price and availability |
+| `POST /tob/skill/create_booking` | Create a booking |
+| `POST /tob/skill/query_booking` | Query a booking |
+| `POST /tob/skill/cancel_booking` | Cancel a booking |
+| `POST /tob/skill/pay_order` | Start payment |
 
-所有请求体需包含客户后台 `/user/home` 生成的 `token`。
+Every request body must include the `token` generated in the customer portal.
 
-## 使用示例
+## Example
 
 ```
-用户：帮我订一下东京的酒店，4月28日入住，4月30日离店，2人
+User: Find a hotel in Tokyo for two adults from April 28 to April 30.
 
-机器人：好的，我来帮您搜索东京的酒店。
-       找到以下 3 家酒店：
-       1. 东京希尔顿酒店 — ¥1,280/晚
-       2. 新宿华盛顿酒店 — ¥850/晚
-       3. 东京皇家公园酒店 — ¥720/晚
-       请问您选择哪家？
+Assistant: TourMind returned 20 candidates. I verified live rooms and rates and selected the five best matches.
 
-用户：第2家，标准间
+           1. Example Hotel
+           [hotel hero image]
+           Lowest matching live rate: JPY 18,000 per night; JPY 36,000 total
+           Why it matches: low verified total in this set; fits two adults; immediately bookable inventory.
 
-机器人：已验价，标准大床房 ¥850/晚，2晚共 ¥1,700。
-       请提供入住人姓名。
+           I can also show the remaining candidates or the complete returned pool.
 
-用户：张三
+User: Show me the standard rooms at the second hotel.
 
-机器人：订单创建成功！订单号：TM20260428001
-       请选择支付方式：Stripe、微信支付 或 支付宝
+Assistant: Here are the hotel's details, room images, and current matching quotes. Choose a room and I will perform a final price and availability check.
 
-用户：Stripe
+User: Book the standard king room.
 
-机器人：已发起 Stripe 支付，请点击链接完成支付：https://...
-       Stripe 平台会按订单金额收取 3.5% 支付处理手续费；这是 Stripe 平台费用，不是酒店订单房费或 TourMind 额外订单费用。
+Assistant: Please provide the guest's full legal name and a contact email. The email is required for booking status and cancellation notifications.
+
+User: Alex Smith, guest@example.com
+
+Assistant: Booking created. TourMind order number: TM20260428001. Choose Stripe, WeChat Pay, or Alipay.
 ```
 
-## 参数参考
+## API reference
 
-常用 region_id 见 [references/parameter_guide.md](references/parameter_guide.md)。
-
-常用地区：北京=569，上海=2862，杭州=1328，深圳=3045，大阪=2446，东京=3263，曼谷=575
+See [references/parameter_guide.md](references/parameter_guide.md) for request fields, POI proxy logic, candidate ranking, image mapping, taxes, and booking rules. Resolve city and region IDs through the live `search_location` endpoint instead of relying on hardcoded values.
