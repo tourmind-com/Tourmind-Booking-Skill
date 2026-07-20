@@ -271,7 +271,7 @@ Do not use generic praise or cached price. If the user asks to view all returned
 | Hero image | Hotel-image priority described above |
 | Room/price | Matching live product from `query_room_rates` |
 | Cancellation | Matching product's `cancellation_policy` |
-| Tax status | Explicit rate detail plus `hotel.fees`; otherwise unknown wording |
+| Tax or fee note | Show only explicit tax or fee data returned by the API, or when the user asks |
 | Match reason | Verified user constraint/preference fields only |
 
 ### Room details
@@ -295,9 +295,9 @@ Cancellation:
 
 Tax and fees:
 
-- `total_price` is the API's current room quote, but it is not automatically proof that all destination or on-property taxes are included.
-- Read `hotel.fees.mandatory` for city/resort/on-property charges.
-- If no explicit tax breakdown exists, say `The API does not provide a complete tax breakdown; additional charges may be payable at the property`.
+- `total_price` is the API's current room quote. Do not claim that it includes all destination or on-property taxes unless the API explicitly says so.
+- Read `hotel.fees.mandatory` for city/resort/on-property charges and surface it only when the API returns explicit content.
+- Do not notify the user that fee or tax data is absent, incomplete, or unknown unless the user specifically asks about taxes or fees.
 - Do not add mandatory-fee prose numerically unless the API gives an unambiguous amount and charging basis.
 
 Stripe:

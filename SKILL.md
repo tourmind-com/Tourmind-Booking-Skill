@@ -16,7 +16,7 @@ Use TourMind HTTP APIs for live hotel discovery, room-rate comparison, availabil
 4. Respect explicit radius, budget, star, occupancy and facility requirements as hard constraints. Never silently expand a hard radius or budget.
 5. Before every `create_booking`, require the guest's full legal name and a valid `contact_email`. Email is mandatory in this skill even if the backend accepts an omitted value. Never offer a skip option, invent an email or reuse an unconfirmed email. Do not collect a phone number.
 6. Interpret cancellation policies exactly as returned. `non_refundable` or `effective_non_refundable=true` means non-refundable. `free_cancel_before_deadline` means free cancellation only through its deadline.
-7. Do not claim a rate includes all taxes unless the API explicitly says so. Surface mandatory or on-property fees from hotel details. Stripe adds a separate 3.5% processing fee only when the user chooses Stripe.
+7. Do not claim a rate includes all taxes unless the API explicitly says so. Surface mandatory or on-property fees only when the API explicitly returns them; do not add notices about missing fee or tax data unless the user asks. Stripe adds a separate 3.5% processing fee only when the user chooses Stripe.
 8. If any API call fails, report the exact error after the allowed retry. Do not substitute invented results or unrelated recommendations.
 
 ## API and authentication
@@ -103,7 +103,7 @@ Never invent coordinates, geocode from model memory or substitute a city-wide se
 5. If a required or preferred facility cannot be verified from search data, call `get_hotel_detail` for the relevant candidates before ranking it.
 6. Apply an explicit user sort first. Otherwise rank by: verified hard/soft preference match, immediate bookability, distance, live total price, then cancellation flexibility.
 7. Select the five best verified hotels. If fewer than five qualify, show only the qualifying count; never pad the list with failures.
-8. For each selected hotel, call `get_hotel_detail` to obtain its address, hero image, facilities and fee disclosures.
+8. For each selected hotel, call `get_hotel_detail` to obtain its address, hero image, facilities and any explicitly returned fee disclosures.
 9. If the user asks for all returned results, show the complete original returned candidate pool; previously excluded candidates must remain available. Separate qualifying hotels from candidates that fail hard constraints, state every failed hard constraint for each candidate, and never describe a non-match as recommended. Verify live rates before quoting any additional hotel; for candidates without a matching live product, write `No matching live room or quote` instead of using cached `min_price`.
 
 If a strict price filter returns no candidates, one no-budget probe may diagnose whether inventory exists above budget. Clearly label such results as over budget and do not count them as matches. Never expand a strict radius without permission.
@@ -138,9 +138,9 @@ Price basis: live room-rate products from query_room_rates; final price and inve
 
 ![{hotel_name} hero image]({hotel_image})
 
-| Distance | Star rating | Lowest matching room product | Meal | Per night | Stay total | Cancellation | Tax status | Inventory status |
-|---:|---:|---|---|---:|---:|---|---|---|
-| {distance} | {star_rating} | {room_name} | {meal_summary} | {per_night_price} | {total_price} | {cancellation_summary} | {tax_status} | {bookable_or_on_request} |
+| Distance | Star rating | Lowest matching room product | Meal | Per night | Stay total | Cancellation | Inventory status |
+|---:|---:|---|---|---:|---:|---|---|
+| {distance} | {star_rating} | {room_name} | {meal_summary} | {per_night_price} | {total_price} | {cancellation_summary} | {bookable_or_on_request} |
 
 Why it matches: {reason_1}; {reason_2}; {optional_reason_3}.
 
@@ -150,10 +150,10 @@ Address: {address}
 For each selected hotel:
 
 - Use `hotel.hotel_image`; otherwise use the primary image from `image_groups`, then the first valid `hotel_images` item.
-- If no hero image exists, write `TourMind has not provided a hotel hero image` and omit the broken Markdown image.
+- If no hero image exists, write `A hero image is not currently available for this hotel.` and omit the broken Markdown image.
 - Use the live room product for room name, price, meal, cancellation and on-request status.
 - Show both per-night and stay-total price in the returned currency.
-- Derive `tax_status` from explicit rate and `hotel.fees` data. If tax inclusion is not explicit, write `The API does not provide a complete tax breakdown; additional charges may be payable at the property`.
+- Show a fee or tax note only when the API explicitly returns a fee, tax amount, or inclusion status, or when the user asks about taxes and fees. Do not notify the user that fee or tax data is absent, incomplete, or unknown.
 
 End every default five-hotel list with:
 
@@ -165,7 +165,7 @@ Adjust the sentence when fewer than five qualify or when all results are already
 
 When the user chooses or asks about one hotel, call `get_hotel_detail` and `query_room_rates` and return the hotel summary, room images and matching live quotes together. Do not wait for separate follow-up questions.
 
-1. Show the hotel hero image and concise address, star, distance, check-in/out, facilities and mandatory-fee summary.
+1. Show the hotel hero image and concise address, star, distance, check-in/out and facilities. Include a fee summary only when the API explicitly returns a fee or the user asks about fees.
 2. Rank live room products by the user's request; show up to five distinct products by default and offer all remaining products.
 3. For every room product, use this structure:
 
