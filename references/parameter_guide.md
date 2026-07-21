@@ -16,7 +16,7 @@ Use this reference when building TourMind requests, resolving POIs, selecting ca
 
 ## Shared request rules
 
-- Base URL: `http://39.108.114.224:9028`
+- Base URL: `http://8.210.23.56:9028`
 - Method: `POST`
 - Content type: `application/json`
 - Authentication: include `token` from `{baseDir}/skill_token.txt` in every request body.
@@ -60,21 +60,18 @@ Resolve city and administrative-area names through `search_location`. Do not rel
 
 Never widen an explicit radius without permission.
 
-### Autonomous POI fallback
+### Google POI resolution
 
-Use this ladder for a landmark, station, ski area, address or business district:
+Use this flow for a landmark, station, ski area, address or business district:
 
 1. Search the complete POI phrase with `search_location`.
-2. Prefer a region/POI whose name, city and country match the user's context and whose latitude/longitude are returned by TourMind.
-3. If no exact POI coordinate is returned, call `search_hotels` in keyword mode.
-4. Use a hotel coordinate as an approximate center only when its TourMind-returned name or address explicitly associates it with the target POI.
-5. Prefer evidence such as an exact station/landmark name, station exit, walking-distance statement or entrance reference.
-6. Disclose the proxy hotel and any returned offset; do not ask the user merely to approve a low-risk proxy choice.
-7. Ask only if candidates point to different cities/countries, no trustworthy proxy has coordinates, or the proxy is unusable for a strict radius.
+2. Use the singular `data.place` returned by TourMind. The API selects the first Google Places result; do not ask the user to select another result in this version.
+3. If the user supplied a radius, preserve it exactly. Otherwise use `place.recommended_radius_km`, currently 3 km.
+4. Pass `place.latitude`, `place.longitude`, the radius, and `location_name=place.name` to `search_hotels`.
+5. State `place.search_scope` when the default radius is used.
+6. If no Google place exists, use an exact TourMind region match when available. Otherwise report that the location cannot be resolved.
 
-For strict radius `R` with a trustworthy known proxy offset `d`, use `R - d` when `0 < d < R`. This conservative radius follows the triangle inequality and reduces false inclusion beyond the original boundary. For soft wording such as “around R”, use `R` and state the approximate-center error.
-
-Do not derive coordinates from model knowledge. Do not average arbitrary hotel coordinates or substitute a city center while describing it as the POI.
+Do not derive coordinates from model knowledge, use a hotel as a proxy center, or substitute a city center while describing it as the requested POI.
 
 ## Endpoint contracts
 
@@ -91,8 +88,9 @@ Response data:
 
 - `regions[]`: `region_id`, names, `region_type`, `latitude`, `longitude`, country and hotel count.
 - `hotels[]`: hotel identifiers and basic name/address/region fields.
+- `place`: the first Google Places result selected by TourMind, including `place_id`, `name`, `formatted_address`, `latitude`, `longitude`, `types`, `source`, `recommended_radius_km` and `search_scope`.
 
-Use the user's city/country context to reject unrelated same-name POIs.
+For a nearby request, use `place` directly. The current API intentionally selects the first Google result.
 
 ### `POST /tob/skill/search_hotels`
 
@@ -114,8 +112,11 @@ Priced-search fields:
 | `room_count` | integer | no | Default 1 |
 | `lowest_price` | number | no | Candidate lower bound in CNY |
 | `highest_price` | number | no | Candidate upper bound in CNY |
+| `location_name` | string | priced searches | Resolved region or Google place name used to describe the result page |
 
-The endpoint returns at most 20 hotels. Common fields include `hotel_id`, `hotel_name`, `hotel_name_cn`, `address`, `star_rating`, `min_price`, `currency_code` and, in nearby mode, `distance_km`.
+The endpoint returns at most 20 hotels. Common fields include `hotel_id`, `hotel_name`, `hotel_name_cn`, `address`, `address_cn`, `hotel_image`, `star_rating`, `min_price`, `currency_code` and, in nearby mode, `distance_km`.
+
+Priced searches also return `search_scope` and `presentation` with `type=text/html`, a temporary public `view_url`, and `expires_at`. Include the `view_url` in the user-facing response so the user can open the visual hotel list.
 
 `min_price` is a recent cached candidate signal. It is not guaranteed for the requested occupancy, room count, meal, cancellation policy or continuous stay. Never present it as a live bookable price.
 
@@ -191,6 +192,8 @@ Each product represents a room/occupancy/meal/cancellation combination and conta
 Use only products whose occupancy and other hard requirements match the user. A non-empty product with `is_on_request=true` is a request/confirmation product, not immediate inventory; label it clearly.
 
 Do not map numeric/string `meal_type` codes to breakfast, dinner or another meal without a documented mapping. `meal_count=0` may be shown as no included meal; when positive but the type is unknown, say `Meal included for {meal_count} guests; type not specified`.
+
+The response also includes `presentation.view_url` and `presentation.expires_at`. The temporary room-rate page displays all returned room products and supports live price verification for a displayed `rate_code`. It does not create an order. After verification, the user can copy the checked quote and return to the authenticated AI conversation to continue booking.
 
 ### `POST /tob/skill/check_room_availability`
 

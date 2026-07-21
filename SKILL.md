@@ -21,7 +21,7 @@ Use TourMind HTTP APIs for live hotel discovery, room-rate comparison, availabil
 
 ## API and authentication
 
-**Base URL:** `http://39.108.114.224:9028`
+**Base URL:** `http://8.210.23.56:9028`
 All endpoints use `POST` with JSON and require `token` from `{baseDir}/skill_token.txt`.
 
 | Capability | Path |
@@ -68,7 +68,7 @@ Choose a location route before searching rates:
 
 ### City or administrative region
 
-Call `search_location`; choose the region matching the user's city/country context and pass its string `region_id` to `search_hotels`.
+Call `search_location`; choose the region matching the user's city/country context and pass its string `region_id` plus the resolved region name as `location_name` to `search_hotels`.
 
 ### Exact hotel name
 
@@ -79,12 +79,10 @@ Call `search_hotels` in keyword mode to resolve the hotel and coordinates. Use `
 Resolve the center autonomously:
 
 1. Call `search_location` with the user's full POI phrase and destination context.
-2. If a matching TourMind region or POI provides coordinates, use them directly without asking for confirmation.
-3. If no exact POI coordinate exists, call `search_hotels` in keyword mode and choose a trustworthy proxy hotel whose returned name or address explicitly ties it to the target POI, station exit or landmark.
-4. Prefer the proxy with the strongest exact-name/address evidence. If the API states an offset such as "180 m from Exit E", retain that offset as `proxy_offset_km`.
-5. Tell the user which TourMind result is used as the approximate center. Do not block the search merely because the center is approximate.
-6. For a strict request such as "within 3 km", when a trustworthy offset `d` is known and `0 < d < R`, call the nearby search with `radius_km = R - d` to conservatively keep results within the original radius. For soft wording such as "around 3 km", use `R` and disclose the possible center error.
-7. Ask the user only if multiple plausible POIs remain in different cities/countries, no trustworthy TourMind coordinate or proxy exists, or the proxy offset is too large for a strict radius.
+2. Use `data.place`, which is the first Google Places result selected by the TourMind API. Do not ask the user to choose among additional Google results in this version.
+3. Use the user's explicit radius when provided. Otherwise use `place.recommended_radius_km` (currently 3 km) and state `place.search_scope` to the user.
+4. Call `search_hotels` with `place.latitude`, `place.longitude`, the selected `radius_km`, and `location_name=place.name`.
+5. If `data.place` is absent, use an exact matching TourMind region when available. Otherwise report that the location could not be resolved; do not invent coordinates or use a proxy hotel.
 
 Never invent coordinates, geocode from model memory or substitute a city-wide search while claiming the results are near the requested POI.
 
@@ -96,6 +94,7 @@ Never invent coordinates, geocode from model memory or substitute a city-wide se
    - **Hard constraints:** dates, occupancy, room count, explicit radius, strict budget, required star level, required facilities or property type.
    - **Soft preferences:** closer, cheaper, higher star level, breakfast, free cancellation, preferred facilities or room type.
 2. Call `search_hotels` with the applicable hard search fields. Preserve the complete raw candidate pool and `distance_km` values so a later "show all" request can be fulfilled.
+   - Preserve `presentation.view_url` and include it as a clickable hotel-results link in the response. Do not expose the underlying token or alter the URL.
 3. Exclude obvious hard-constraint failures from the recommendation/ranking pool, but retain them in the raw pool with every failed constraint recorded.
 4. Call `query_room_rates` for every remaining candidate needed to rank the recommendation pool fairly, in controlled batches. Do not stop at the first five cached-price results. Exclude candidates with no matching live product from recommendations, but retain their no-live-product status in the raw pool.
    - `is_on_request=false` is immediately bookable inventory.
@@ -133,6 +132,7 @@ Stay: {check_in_date} to {check_out_date}, {night_count} nights
 Guests: {adults} adults per room, {room_count} rooms
 Filters and ranking: {hard_constraints_and_sort}
 Price basis: live room-rate products from query_room_rates; final price and inventory remain subject to availability verification
+View hotel results: {presentation.view_url}
 
 ### 1. {hotel_name}
 
@@ -164,6 +164,8 @@ Adjust the sentence when fewer than five qualify or when all results are already
 ## Required hotel and room-detail response
 
 When the user chooses or asks about one hotel, call `get_hotel_detail` and `query_room_rates` and return the hotel summary, room images and matching live quotes together. Do not wait for separate follow-up questions.
+
+Include `query_room_rates.data.presentation.view_url` as a clickable room-rate page. Explain that the page supports live price verification; after verification, the user can copy the checked quote and return to the authenticated AI conversation to continue booking. Never claim that the temporary public page creates an order directly.
 
 1. Show the hotel hero image and concise address, star, distance, check-in/out and facilities. Include a fee summary only when the API explicitly returns a fee or the user asks about fees.
 2. Rank live room products by the user's request; show up to five distinct products by default and offer all remaining products.

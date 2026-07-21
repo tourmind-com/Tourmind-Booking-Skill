@@ -45,7 +45,7 @@ The token file is excluded by `.gitignore` and must never be committed. Restart 
 
 ## API
 
-**Base URL:** `http://39.108.114.224:9028`
+**Base URL:** `http://8.210.23.56:9028`
 
 | Endpoint | Purpose |
 |---|---|
