@@ -33,8 +33,10 @@ If the token file is absent or empty, ask the user for a newly generated Skill T
 - Resolve relative dates in the user's timezone and show the exact dates used.
 - For a date without a year, use the next future occurrence and disclose the assumption.
 - Default `room_count` to 1 when omitted.
+- If `adults` is also omitted, default to 1 adult per room. Tell the user that the search uses 1 guest in 1 room and invite them to provide the guest count if multiple people will stay. Translate this notice into the user's language.
+- Preserve any adult count the user already provided; never replace it with the default.
 - `adults` means adults per room, not the total across all rooms.
-- Do not call live-rate endpoints until location, check-in, check-out and adults are known.
+- Do not call live-rate endpoints until location, check-in and check-out are known. Supply the default adult count when the user omitted it.
 
 Currency values use ISO 4217 codes such as `CNY`, `USD`, `EUR`, `GBP` or `JPY`. Display the currency returned by the API; do not silently relabel it.
 

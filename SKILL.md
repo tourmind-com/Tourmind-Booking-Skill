@@ -11,7 +11,7 @@ Use TourMind HTTP APIs for live hotel discovery, room-rate comparison, availabil
 ## Non-negotiable rules
 
 1. Use only TourMind API data for hotels, coordinates, rooms, images, prices, policies and availability. Never fill gaps from memory or training data.
-2. Before the first API call, require a location, check-in date, check-out date and adult count. Apply the safe defaults below instead of asking unnecessary questions.
+2. Before the first API call, require a location, check-in date and check-out date. If adult count is omitted, use 1 adult per room and explicitly tell the user that the search assumes one guest; invite them to provide the guest count for multiple occupancy. Apply the safe defaults below instead of asking unnecessary questions.
 3. Treat `search_hotels.min_price` as a cached candidate signal only. Present a hotel as having a live rate product and quote a price only after `query_room_rates` returns a matching product. Describe inventory as immediately bookable only when that product has `is_on_request=false`.
 4. Respect explicit radius, budget, star, occupancy and facility requirements as hard constraints. Never silently expand a hard radius or budget.
 5. Before every `create_booking`, require the guest's full legal name and a valid `contact_email`. Email is mandatory in this skill even if the backend accepts an omitted value. Never offer a skip option, invent an email or reuse an unconfirmed email. Do not collect a phone number.
@@ -53,14 +53,14 @@ Do not ask for information that can be inferred safely. State every applied assu
 
 | Missing or vague input | Default behavior |
 |---|---|
-| `room_count` omitted | Use 1 room. |
+| `room_count` omitted | Use 1 room and disclose the assumed occupancy. If adult count is also omitted, use 1 adult for that room and tell the user: `I will search for 1 guest in 1 room; tell me if more people will stay.` Translate this message into the user's language. |
 | Date has no year | Use the next future occurrence in the user's timezone. Show the resolved `YYYY-MM-DD` dates. |
 | Relative date such as tonight or tomorrow | Resolve it to exact dates in the user's timezone. |
 | "Nearby" or "as close as possible" with no radius | Use 3 km and state that default. |
 | Sort order omitted | Rank by verified preference match, then distance, live total price and cancellation flexibility. |
 | Budget wording such as "under 2000" is ambiguous | Clarify whether it is per night or trip total before applying a hard filter. |
 
-Still ask when the location, check-in date, check-out date or adult count cannot be inferred. Ensure checkout is later than check-in and all dates sent to the API use `YYYY-MM-DD`.
+Still ask when the location, check-in date or check-out date cannot be inferred. Never replace an adult count the user already provided. Ensure checkout is later than check-in and all dates sent to the API use `YYYY-MM-DD`.
 
 ## Location and POI resolution
 
