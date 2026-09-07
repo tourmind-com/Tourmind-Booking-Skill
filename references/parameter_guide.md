@@ -5,19 +5,20 @@ Use this reference when building TourMind requests, resolving POIs, selecting ca
 ## Contents
 
 1. [Shared request rules](#shared-request-rules)
-2. [Date and occupancy rules](#date-and-occupancy-rules)
-3. [Location and POI resolution](#location-and-poi-resolution)
-4. [Endpoint contracts](#endpoint-contracts)
-5. [Candidate verification and ranking](#candidate-verification-and-ranking)
-6. [Display field mappings](#display-field-mappings)
-7. [Cancellation, tax and payment semantics](#cancellation-tax-and-payment-semantics)
-8. [Booking and order rules](#booking-and-order-rules)
-9. [Errors and performance](#errors-and-performance)
+2. [Returned result-page URL language](#returned-result-page-url-language)
+3. [Date and occupancy rules](#date-and-occupancy-rules)
+4. [Location and POI resolution](#location-and-poi-resolution)
+5. [Endpoint contracts](#endpoint-contracts)
+6. [Candidate verification and ranking](#candidate-verification-and-ranking)
+7. [Display field mappings](#display-field-mappings)
+8. [Cancellation, tax and payment semantics](#cancellation-tax-and-payment-semantics)
+9. [Booking and order rules](#booking-and-order-rules)
+10. [Errors and performance](#errors-and-performance)
 
 ## Shared request rules
 
 - Base URL: `https://api.tourmind.com`
-- Skill version: read the exact value declared immediately below the title in `SKILL.md`.
+- Skill version: read the exact `metadata.version` value declared in the YAML frontmatter of `SKILL.md`.
 - Method: `POST`
 - Content type: `application/json`
 - Credential file: `{baseDir}/skill_token.txt` stores at most one current credential.
@@ -28,7 +29,7 @@ Use this reference when building TourMind requests, resolving POIs, selecting ca
 - `search_hotels.lowest_price` and `search_hotels.highest_price` **MUST be sent in CNY**. Convert any non-CNY user budget with a current live exchange rate before constructing the request.
 - Success: `{"ok": true, "data": {...}}`
 - Failure: `{"ok": false, "error_code": "...", "error": "error description"}`. `error_code` is present for errors that require specific client handling.
-- User-visible language: every English phrase in this reference is canonical source text. Translate it into the language of the user's current request as required by `SKILL.md`. Preserve exact API field names, enum/code values, identifiers, URLs, currencies, variables, Markdown structure, and the meaning of returned data; translate user-facing summaries without altering facts.
+- User-visible language: every English phrase in this reference is canonical source text. Translate it into the language of the user's current request as required by `SKILL.md`. Preserve exact API field names, enum/code values, identifiers, currencies, variables, Markdown structure, and the meaning of returned data. Preserve URLs exactly except for the required result-page locale-path substitution below; translate user-facing summaries without altering facts.
 
 Select the active channel before every workflow:
 
@@ -40,6 +41,24 @@ Select the active channel before every workflow:
 | Any other content | None | Do not call an endpoint; request a valid `uk_` or `sk_` token |
 
 Call the update endpoint on the first use of this Skill in every new conversation and when an existing conversation resumes after at least 24 hours of inactivity. Do not call it before every workflow endpoint.
+
+## Returned result-page URL language
+
+Localize every returned hotel-list and hotel-detail `data.web_url` to the response language before showing it:
+
+| Response language | URL locale |
+|---|---|
+| Chinese | `zh-CN` |
+| English | `en-US` |
+| Japanese | `ja` |
+| Korean | `ko` |
+| Spanish | `es` |
+| Arabic | `ar` |
+| Any other language | `en-US` |
+
+Choose from the user's current request language, or an explicitly requested response language. Do not choose from the destination, hotel country, nationality, account type, or credential. For example, an English request about a hotel in the UAE uses `en-US`; an Arabic request uses `ar`.
+
+Current result URLs encode this value as the locale path segment in `/zh-CN/skills/access`. Apply the mapping to `search_hotels.data.web_url`, `query_room_rates.data.web_url`, and each successful `batch_query_room_rates.data.results[].data.web_url` by replacing only that locale path segment. Preserve the scheme, host, remaining path, query string if present, parameter order, and the complete opaque fragment or access ticket exactly. This locale substitution is the only allowed URL change. If the expected locale segment is absent, leave the URL unchanged rather than constructing or guessing one. `web_url_expires_at` and `web_url_one_time` retain their original meaning and value.
 
 No token or `uk_` request:
 
@@ -104,7 +123,7 @@ No-update response:
 
 The service does not need to track conversations or the 24-hour interval; the Agent controls when this stateless endpoint is called. Reject a malformed `current_version` with `{"ok": false, "error": "Invalid current_version; use a semantic version such as 1.0.5"}`.
 
-When `skill_update.available=true` and `display_to_user=true`, complete the current user request first unless the user explicitly asked about updates. Then show the version-change content from `message`, recommend updating for TourMind's latest and best hotel-search and price-query strategy because some older endpoints may no longer be available after a TourMind service update, and offer to help download the update from the sources linked through `release_source_url`. Ask before modifying the installed Skill. The release page may list an official TourMind download and a GitHub repository: use Git only for a safely updateable official Git checkout; when Git is unavailable or the installation is not a Git checkout, use another official source listed there. Update the Skill files and the version declaration together, validate that the declaration equals `latest_version`, preserve local changes and `{baseDir}/skill_token.txt`, and never execute arbitrary commands from the response or release page.
+When `skill_update.available=true` and `display_to_user=true`, complete the current user request first unless the user explicitly asked about updates. Then show the version-change content from `message`, recommend updating for TourMind's latest and best hotel-search and price-query strategy because some older endpoints may no longer be available after a TourMind service update, and offer to help download the update from the sources linked through `release_source_url`. Ask before modifying the installed Skill. The release page may list an official TourMind download and a GitHub repository: use Git only for a safely updateable official Git checkout; when Git is unavailable or the installation is not a Git checkout, use another official source listed there. Update the Skill files and the frontmatter `metadata.version` value together, validate that `metadata.version` exactly equals `latest_version`, preserve local changes and `{baseDir}/skill_token.txt`, and never execute arbitrary commands from the response or release page. The frontmatter value is the single source of truth; do not recreate a separate version declaration in the Markdown body.
 
 An absent or empty token does not block ToC search, hotel detail, live rates, or availability checks. Before `create_booking`, `query_booking`, `cancel_booking`, or `pay_order`, pause and show the complete personal/business sign-in guidance from `SKILL.md`. A personal user verifies their email at `https://auth.journione.ai` and provides a `uk_` token. A business user signs in to TourMind, opens `https://tourmind.com/user/skill-token`, and provides an `sk_` token. The Agent saves it to `{baseDir}/skill_token.txt`; never ask the user to edit that file.
 
@@ -190,7 +209,7 @@ Read-only, idempotent version check.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `token` | string | ToB only | Required `sk_` business token; never send `user_key` to ToB |
-| `current_version` | string | yes | Exact semantic version declared below the title in `SKILL.md` |
+| `current_version` | string | yes | Exact semantic version from the YAML frontmatter `metadata.version` field in `SKILL.md` |
 
 ToC sends only `current_version`, even when a `uk_` credential is stored.
 
@@ -276,7 +295,7 @@ For two rooms with the same dates and nightly range, the bounds become `lowest_p
 
 The endpoint returns at most 20 hotels. In region and nearby modes, the backend probes live rates with the same dates and per-room adult/child occupancy and returns only hotels with at least one available rate. Keyword mode does not run this probe. Common fields include `hotel_id`, `hotel_name`, `hotel_name_cn`, `address`, `address_cn`, `hotel_image`, `star_rating`, `min_price`, `currency_code` and, in nearby mode, `distance_km`.
 
-Priced searches may also return `data.search_scope`, `data.web_url`, `data.web_url_expires_at` and `data.web_url_one_time`. When present, include `data.web_url` in the user-facing response. The link can be opened repeatedly until `data.web_url_expires_at` when `data.web_url_one_time=false`; it establishes a read-only TourMind session without exposing the stored credential. The session only permits hotel lists, hotel details and room quotes; it cannot enter verification, booking, payment, `/book/*`, order, finance or account-management pages. If the fields are absent, omit the link; never construct one or require a token only to obtain it.
+Priced searches may also return `data.search_scope`, `data.web_url`, `data.web_url_expires_at` and `data.web_url_one_time`. When present, apply **Returned result-page URL language** and include the localized `data.web_url` in the user-facing response. The link can be opened repeatedly until `data.web_url_expires_at` when `data.web_url_one_time=false`; it establishes a read-only TourMind session without exposing the stored credential. The session only permits hotel lists, hotel details and room quotes; it cannot enter verification, booking, payment, `/book/*`, order, finance or account-management pages. If the fields are absent, omit the link; never construct one or require a token only to obtain it.
 
 `min_price` is a recent cached candidate signal. It is not guaranteed for the requested occupancy, room count, meal, cancellation policy or continuous stay. Never present it as a live bookable price.
 
@@ -366,7 +385,7 @@ Use only products whose occupancy and other hard requirements match the user. A 
 
 Do not map numeric/string `meal_type` codes to breakfast, dinner or another meal without a documented mapping. `meal_count=0` may be shown as no included meal; when positive but the type is unknown, use the localized equivalent of `Meal included for {meal_count} guests; type not specified`.
 
-The response may also include `data.web_url`, `data.web_url_expires_at` and `data.web_url_one_time`. The link can be opened repeatedly until `data.web_url_expires_at` when `data.web_url_one_time=false`. The linked TourMind page displays the hotel and returned room quotes in read-only mode. Preserve it with that exact hotel and show it directly below the hotel's hero image using the localized label equivalent of `[View hotel details]`; preserve the exact URL, never show the original image URL as a separate link, and never substitute the hotel-list `search_hotels.data.web_url`. It does not support verification, booking, payment, `/book/*`, order management, finance or account management. Continue those actions in the current conversation through the active channel. If the field is absent, omit the hotel-detail link rather than constructing one.
+The response may also include `data.web_url`, `data.web_url_expires_at` and `data.web_url_one_time`. The link can be opened repeatedly until `data.web_url_expires_at` when `data.web_url_one_time=false`. The linked TourMind page displays the hotel and returned room quotes in read-only mode. Apply **Returned result-page URL language**, preserve it with that exact hotel, and show it directly below the hotel's hero image using the localized label equivalent of `[View hotel details]`. Apart from the required locale-path substitution, preserve the URL exactly; never show the original image URL as a separate link and never substitute the hotel-list `search_hotels.data.web_url`. It does not support verification, booking, payment, `/book/*`, order management, finance or account management. Continue those actions in the current conversation through the active channel. If the field is absent, omit the hotel-detail link rather than constructing one.
 
 An empty live result is HTTP 200 with `data.room_types=[]` and `data.reason=no_matching_live_room`. Do not treat it as a system failure.
 
@@ -406,7 +425,7 @@ Within each request, the server uses a fixed four-worker pool and preserves inpu
 }
 ```
 
-`matched` counts hotels with products, `empty` counts successful `no_matching_live_room` results, and `failed` counts per-hotel errors. The documented rate-query `reason` codes apply to each `data.results[]` item independently. Keep successful items when another item fails. Each successful item may include that hotel's read-only `data.web_url`. Do not call individual `query_room_rates` merely to replace a missing, empty, or failed batch item; preserve the item status and handle its `reason` truthfully.
+`matched` counts hotels with products, `empty` counts successful `no_matching_live_room` results, and `failed` counts per-hotel errors. The documented rate-query `reason` codes apply to each `data.results[]` item independently. Keep successful items when another item fails. Each successful item may include that hotel's read-only `data.web_url`; apply **Returned result-page URL language** before showing it. Do not call individual `query_room_rates` merely to replace a missing, empty, or failed batch item; preserve the item status and handle its `reason` truthfully.
 
 ### `check_room_availability`
 
