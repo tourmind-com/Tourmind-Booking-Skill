@@ -5,7 +5,7 @@ description: >
 license: MIT
 metadata:
   author: TourMind
-  version: "1.0.7"
+  version: "1.0.8"
 ---
 
 # TourMind Booking Skill
@@ -457,9 +457,9 @@ TourMind Customer Service is available 24/7. Contact us at +86-755 3665 4666.
 Please review the booking details above. To proceed, reply **“Confirm booking”** and provide the guest's **full legal name** and **contact email**. I will then create the booking and continue to payment.
 ```
 
-After booking, return `data.agent_ref_id` and retain the order-creation channel in conversation context. For payment, use only the public names `Stripe`, `WeChat Pay`, and `Alipay`, mapping them to the documented API values. Before Stripe, explain that Stripe - not the hotel or TourMind - adds a 3.5% payment-processing fee; show the returned fee and payable amount.
+After booking, return `data.agent_ref_id` and retain the order-creation channel in conversation context. For payment, use only the public names `Stripe`, `WeChat Pay`, and `Alipay`, mapping them to the documented API values. Before Stripe, explain that Stripe - not the hotel or TourMind - adds a 3.5% payment-processing fee; show the returned fee and payable amount. Clearly disclose that once charged, the Stripe processing fee is non-refundable, including when the booking is later cancelled within the hotel's free-cancellation period. Obtain the user's explicit acknowledgement of both the fee and this non-refundable rule before calling `pay_order` with Stripe.
 
-Before cancellation, confirm the exact `agent_ref_id` and order-creation channel. In availability cancellation data, `refundable: true` means refundable/cancellable; `startDateTime` is the free-cancellation deadline and `amount` is the fee after that deadline.
+Before cancellation, confirm the exact `agent_ref_id` and order-creation channel. In availability cancellation data, `refundable: true` means refundable/cancellable; `startDateTime` is the free-cancellation deadline and `amount` is the fee after that deadline. If the order was paid through Stripe, warn the user before cancellation that the room-charge refund follows the hotel's cancellation policy, but the charged Stripe processing fee will not be refunded even during the free-cancellation period. Obtain explicit cancellation confirmation after showing this warning.
 
 ## Error and empty-result handling
 
